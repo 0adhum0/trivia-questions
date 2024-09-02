@@ -6,17 +6,15 @@ document.addEventListener("DOMContentLoaded", function () {
 	function getTriviaQuestion() {
 		// Request questions from the 'society_and_culture' category
 		const apiUrl =
-			"https://opentdb.com/api.php?amount=1&difficulty=easy&type=multiple&category=24"; // Adjust category as needed
+			"https://opentdb.com/api.php?amount=1&difficulty=easy&type=multiple&category=24";
 
 		fetch(apiUrl)
 			.then((response) => {
 				if (response.status === 429) {
-					// Rate limit error
 					throw new Error(
 						"Too many requests. Please wait a moment and try again."
 					);
 				} else if (!response.ok) {
-					// Other errors
 					throw new Error(
 						"An error occurred while fetching trivia questions."
 					);
@@ -26,7 +24,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			.then((data) => {
 				const questionContainer =
 					document.getElementById("questionContainer");
-				questionContainer.innerHTML = ""; // Clear previous question
+				questionContainer.innerHTML = "";
 
 				if (data.results.length === 0) {
 					questionContainer.innerHTML =
@@ -42,71 +40,58 @@ document.addEventListener("DOMContentLoaded", function () {
 				questionElement.innerHTML = result.question;
 				questionItem.appendChild(questionElement);
 
-				let attempted = false; // Track if an attempt has been made
+				translateText(result.question, "de", (translatedQuestion) => {
+					questionElement.innerHTML = translatedQuestion;
 
-				if (result.type === "multiple") {
-					// Multiple Choice Question
-					const answers = [
-						...result.incorrect_answers,
-						result.correct_answer,
-					];
-					shuffleArray(answers); // Randomize the answer order
+					if (result.type === "multiple") {
+						const answers = [
+							...result.incorrect_answers,
+							result.correct_answer,
+						];
+						shuffleArray(answers);
 
-					answers.forEach((answer) => {
-						const answerElement = document.createElement("p");
-						answerElement.classList.add("answer");
-						answerElement.innerHTML = answer;
-						answerElement.onclick = function () {
-							if (attempted) return; // Prevent further attempts
-							attempted = true; // Mark as attempted
+						answers.forEach((answer) => {
+							translateText(answer, "de", (translatedAnswer) => {
+								const answerElement =
+									document.createElement("p");
+								answerElement.classList.add("answer");
+								answerElement.innerHTML = translatedAnswer;
+								answerElement.onclick = function () {
+									if (
+										answerElement.style.pointerEvents ===
+										"none"
+									)
+										return;
 
-							// Check if clicked answer is correct
-							if (answer === result.correct_answer) {
-								this.style.color = "green";
-								this.innerHTML += " (Correct)";
-							} else {
-								this.style.color = "red";
-								this.innerHTML += ` (Incorrect). The correct answer is: ${result.correct_answer}`;
-							}
+									answerElement.style.pointerEvents = "none"; // Disable after click
 
-							// Disable all options after the first attempt
-							document
-								.querySelectorAll(".answer")
-								.forEach((element) => {
-									element.onclick = null;
-								});
-						};
-						questionItem.appendChild(answerElement);
-					});
-				} else if (result.type === "boolean") {
-					// True/False Question
-					const trueButton = document.createElement("button");
-					trueButton.innerHTML = "True";
-					trueButton.onclick = function () {
-						revealAnswer(true);
-					};
-					questionItem.appendChild(trueButton);
+									if (answer === result.correct_answer) {
+										this.style.color = "green";
+										this.innerHTML += " (Correct)";
+									} else {
+										this.style.color = "red";
+										translateText(
+											result.correct_answer,
+											"de",
+											(translatedCorrectAnswer) => {
+												this.innerHTML += ` (Incorrect). The correct answer is: ${translatedCorrectAnswer}`;
+											}
+										);
+									}
 
-					const falseButton = document.createElement("button");
-					falseButton.innerHTML = "False";
-					falseButton.onclick = function () {
-						revealAnswer(false);
-					};
-					questionItem.appendChild(falseButton);
-
-					function revealAnswer(userAnswer) {
-						const isCorrect =
-							(userAnswer && result.correct_answer === "True") ||
-							(!userAnswer && result.correct_answer === "False");
-						questionContainer.innerHTML = `The correct answer is: ${
-							result.correct_answer
-						}.<br> You were ${
-							isCorrect ? "correct" : "incorrect"
-						}.`;
+									document
+										.querySelectorAll(".answer")
+										.forEach((element) => {
+											element.onclick = null;
+										});
+								};
+								questionItem.appendChild(answerElement);
+							});
+						});
+					} else if (result.type === "boolean") {
+						// Handle True/False Questions
 					}
-				} else {
-					questionContainer.innerHTML = "Unsupported question type.";
-				}
+				});
 
 				questionContainer.appendChild(questionItem);
 			})
@@ -117,7 +102,30 @@ document.addEventListener("DOMContentLoaded", function () {
 			});
 	}
 
-	// Utility function to shuffle array elements
+	function translateText(text, targetLanguage, callback) {
+		const translateApiUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(
+			text
+		)}&langpair=en|${targetLanguage}`;
+
+		fetch(translateApiUrl)
+			.then((response) => {
+				if (!response.ok) {
+					throw new Error(
+						"An error occurred while translating the text."
+					);
+				}
+				return response.json();
+			})
+			.then((data) => {
+				const translatedText = data.responseData.translatedText;
+				callback(translatedText);
+			})
+			.catch((error) => {
+				console.error("Error translating text:", error);
+				callback(text); // Fallback to original text if translation fails
+			});
+	}
+
 	function shuffleArray(array) {
 		for (let i = array.length - 1; i > 0; i--) {
 			const j = Math.floor(Math.random() * (i + 1));
